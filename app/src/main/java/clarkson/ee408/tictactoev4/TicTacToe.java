@@ -3,13 +3,22 @@ package clarkson.ee408.tictactoev4;
 public class TicTacToe {
     public static final int SIDE = 3;
     private int turn;
+    private int player;
     private int [][] game;
 
-    public TicTacToe( ) {
+    public TicTacToe(int player) {
+        this.player = player;
         game = new int[SIDE][SIDE];
         resetGame( );
     }
 
+    public int getPlayer(){
+        return player;
+    }
+
+    public void setPlayer(int player){
+        this.player=player;
+    }
     public int play( int row, int col ) {
         int currentTurn = turn;
         if( row >= 0 && col >= 0 && row < SIDE && col < SIDE
@@ -84,12 +93,20 @@ public class TicTacToe {
         turn = 1;
     }
 
-    public String result( ) {
-        if( whoWon( ) > 0 )
-            return "Player " + whoWon( ) + " won";
-        else if( canNotPlay( ) )
+    public String result() {
+        if (whoWon() > 0) {
+            if (player == whoWon()) {
+                return "You Won";
+            } else {
+                return "You Lost";
+            }
+        } else if (canNotPlay()) {
             return "Tie Game";
-        else
+        } else {
             return "PLAY !!";
+        }
+    }
+    public void switchPlayer() {
+        player = (player == 1) ? 2 : 1;
     }
 }
