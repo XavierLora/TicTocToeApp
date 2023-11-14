@@ -15,7 +15,7 @@ public class Response {
 
     private ResponseStatus status;
     private String message;
-    private String data;
+
     /**
      * Default constructor for the `Response` class.
      */
@@ -67,22 +67,5 @@ public class Response {
      */
     public void setMessage(String message) {
         this.message = message;
-    }
-    /**
-     * Gets the response data.
-     *
-     * @return The response data.
-     */
-    public String getData() {
-        return data;
-    }
-
-    /**
-     * Sets the response data.
-     *
-     * @param data The new response data to set.
-     */
-    public void setData(String data) {
-        this.data = data;
     }
 }

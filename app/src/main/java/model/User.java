@@ -97,16 +97,16 @@ public class User {
     /**
      * Checks if this `User` object is equal to another object based on the username.
      *
-     * @param o The object to compare.
+     * @param obj The object to compare.
      * @return `true` if the objects are equal (have the same username), `false` otherwise.
      */
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        } else if (o == null || getClass() != o.getClass()) {
+    @Override
+    public boolean equals(Object obj) {
+        try {
+            User other = (User) obj;
+            return this.username.equals(other.getUsername());
+        } catch (ClassCastException e) {
             return false;
         }
-        User user = (User) o;
-        return username.equals(user.username);
     }
 }

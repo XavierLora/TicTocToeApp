@@ -1,96 +1,126 @@
 package client;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.net.Socket;
-import socket.Request;
+import android.util.Log;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.net.UnknownHostException;
+
+import socket.GamingResponse;
+import socket.Request;
+
 public class SocketClient {
+    /**
+     * Logging Tag, this will help distinct log coming from this class from other logs
+     */
+    private static final String TAG = "SOCKET_CLIENT";
+
+    /**
+     * The singleton instance of this class
+     */
     private static SocketClient instance;
+
+    /**
+     * Used for object serialization
+     */
+    private final Gson gson;
+
+    /**
+     * Socket connection with the server
+     */
     private Socket socket;
+
+    /**
+     * Stream used to read (receive) server response to our request
+     */
     private DataInputStream inputStream;
+
+    /**
+     * Stream used to write (send) our request to the server
+     */
     private DataOutputStream outputStream;
-    private Gson gson;
-    private String serverIp;
-    private int serverPort;
 
-    // Private constructor for Singleton pattern
-    private SocketClient() {
-        gson = new GsonBuilder().serializeNulls().create();
-    }
-
-    // Getter for the class instance (Singleton)
-    public synchronized static SocketClient getInstance() {
-        if (instance == null) {
+    /**
+     * A static function that serves as a getter for the only class instance
+     * @return the only class instance
+     */
+    public synchronized static SocketClient getInstance(){
+        if(instance == null) {
+            Log.e(TAG, "Creating socket instance singleton");
             instance = new SocketClient();
+            Log.e(TAG, "Socket instance created");
         }
         return instance;
     }
 
-    // Set the server's IP address and port number
-    public void setServer(String serverIp, int serverPort) {
-        this.serverIp = serverIp;
-        this.serverPort = serverPort;
-    }
+    /**
+     * A private constructor that instantiate the class and set attributes
+     * Can be accessed only the within the class (for singleton design pattern)
+     */
+    private SocketClient() {
+        String HOSTNAME = "192.168.68.104";
+        int PORT = 5850;
 
-    // Open a socket connection to the server
-    public boolean connectToServer() {
+        gson = new GsonBuilder().serializeNulls().create();
+
         try {
-            socket = new Socket(serverIp, serverPort);
+            socket = new Socket(InetAddress.getByName(HOSTNAME), PORT);
             inputStream = new DataInputStream(socket.getInputStream());
             outputStream = new DataOutputStream(socket.getOutputStream());
-            return true;
+        } catch (UnknownHostException e) {
+            Log.e(TAG, "Could not Resolve Host", e);
         } catch (IOException e) {
-            e.printStackTrace();
-            return false;
+            Log.e(TAG, "Client IOStreams Failed", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Unknown Exception Occurred", e);
         }
     }
 
-    // Close socket connection and all IO streams
-    public void close() {
-        try {
-            if (inputStream != null) {
-                inputStream.close();
-            }
-            if (outputStream != null) {
-                outputStream.close();
-            }
-            if (socket != null && !socket.isClosed()) {
-                socket.close();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    // Send a serialized request to the server and return a response of a specific class
+    /**
+     *
+     * @param request The request to be sent to the server
+     * @param responseClass The class of response we expect from the server
+     * @return Object of the responseClass received from the server
+     * @param <T> {@link socket.Response} class or one of its subclasses e.g., {@link socket.GamingResponse}
+     */
     public <T> T sendRequest(Request request, Class<T> responseClass) {
         try {
-            if (socket == null) {
-                // If the socket is not initialized, try to initialize it.
-                if (!connectToServer()) {
-                    // Handle connection failure
-                    return null;
-                }
-            }
-
-            if (outputStream == null) {
-                // If the outputStream is not initialized, try to initialize it.
-                outputStream = new DataOutputStream(socket.getOutputStream());
-            }
-
-            String jsonRequest = gson.toJson(request);
-            outputStream.writeUTF(jsonRequest);
+            // Send Request
+            String serializedRequest = gson.toJson(request);
+            outputStream.writeUTF(serializedRequest);
             outputStream.flush();
 
-            String jsonResponse = inputStream.readUTF();
-            return gson.fromJson(jsonResponse, responseClass);
+            // Get Response
+            String serializedResponse = inputStream.readUTF();
+            return gson.fromJson(serializedResponse, responseClass);
         } catch (IOException e) {
-            e.printStackTrace();
-            return null;
+            close();
+            Log.e(TAG, "Client IOStreams Failed", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Unknown Exception Occurred", e);
+        }
+        return null;
+    }
+
+    /**
+     * Closes the socket connection with the server and all IO Streams
+     * Destruct the singleton instance
+     */
+    public void close() {
+        try {
+            if(socket != null) socket.close();
+            if(inputStream != null) inputStream.close();
+            if(outputStream != null) outputStream.close();
+            instance = null;
+        } catch (IOException e) {
+            Log.e(TAG, "Client IOStreams Failed", e);
         }
     }
+
 }

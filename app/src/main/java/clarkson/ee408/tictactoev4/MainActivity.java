@@ -4,66 +4,62 @@ import android.content.DialogInterface;
 import android.graphics.Color;
 import android.graphics.Point;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.GridLayout;
 import android.widget.TextView;
-import android.os.Bundle;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import android.os.Handler;
-import android.os.Looper;
+import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import socket.Response;
-import socket.Request;
-import client.SocketClient;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import client.AppExecutors;
+import client.SocketClient;
+import socket.GamingResponse;
+import socket.Request;
+import socket.Response;
 
 public class MainActivity extends AppCompatActivity {
+
+    /**
+     * Logging Tag, this will help distinct log coming from this class from other logs
+     */
+    private static final String TAG = "MAIN_ACTIVITY";
+
     private TicTacToe tttGame;
     private Button [][] buttons;
     private TextView status;
-    private Gson gson;
-    private Handler handler;
-    private static final int REQUEST_INTERVAL = 1000;
-    private boolean shouldRequestMove = false;
-    private final AppExecutors appExecutors = AppExecutors.getInstance(); // Initialize the AppExecutors instance
 
+    private Gson gson;
+
+    private Handler handler;
+    private Runnable refresh;
+
+    private boolean shouldRequestMove;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    protected void onCreate( Bundle savedInstanceState ) {
+        super.onCreate( savedInstanceState );
         tttGame = new TicTacToe(2);
+        buildGuiByCode( );
+
         gson = new GsonBuilder().serializeNulls().create();
-        buildGuiByCode();
-        handler = new Handler(Looper.getMainLooper());
-
-        final AppExecutors appExecutors = AppExecutors.getInstance();
-
-        // Start a background thread for socket connection and requesting moves
-        appExecutors.networkIO().execute(new Runnable() {
-            @Override
-            public void run() {
-                // Set the server's IP address and port number
-                SocketClient.getInstance().setServer("192.168.68.104", 5650);
-
-                // Connect to the server
-                if (SocketClient.getInstance().connectToServer()) {
-                    shouldRequestMove = true; // Connection successful, enable requestMove
-                } else {
-                    // Handle connection failure, e.g., show an error message
-                    shouldRequestMove = false;
-                }
-
-                startPeriodicRequests();
-            }
-        });
+        updateTurnStatus();
+        // Background Timer
+        handler = new Handler();
+        refresh = () -> {
+            if(shouldRequestMove) requestMove();
+            handler.postDelayed(refresh, 500);
+        };
+        handler.post(refresh);
     }
 
-
+    /**
+     * Build the initial game graphical user interface
+     */
     public void buildGuiByCode( ) {
         // Get width of the screen
         Point size = new Point( );
@@ -130,6 +126,11 @@ public class MainActivity extends AppCompatActivity {
         setContentView( gridLayout );
     }
 
+    /**
+     * Updates the game board by adding a move at a particular position
+     * @param row move row
+     * @param col move column
+     */
     public void update( int row, int col ) {
         int play = tttGame.play( row, col );
         if( play == 1 )
@@ -140,146 +141,152 @@ public class MainActivity extends AppCompatActivity {
             status.setBackgroundColor( Color.RED );
             enableButtons( false );
             status.setText( tttGame.result( ) );
+            shouldRequestMove = false;
             showNewGameDialog( );	// offer to play again
+        }else {
+            updateTurnStatus();
         }
     }
 
+    /**
+     * Enable or Disable button of the game board
+     * @param enabled whether to enable or disable
+     */
     public void enableButtons( boolean enabled ) {
         for( int row = 0; row < TicTacToe.SIDE; row++ )
             for( int col = 0; col < TicTacToe.SIDE; col++ )
                 buttons[row][col].setEnabled( enabled );
     }
 
+    /**
+     * Resets the game board UI
+     */
     public void resetButtons( ) {
         for( int row = 0; row < TicTacToe.SIDE; row++ )
             for( int col = 0; col < TicTacToe.SIDE; col++ )
                 buttons[row][col].setText( "" );
     }
 
+    /**
+     * Display new game dialog
+     */
+    public void showNewGameDialog( ) {
+        AlertDialog.Builder alert = new AlertDialog.Builder( this );
+        alert.setTitle(tttGame.result());
+        alert.setMessage( "Do you want to play again?" );
+        PlayDialog playAgain = new PlayDialog( );
+        alert.setPositiveButton( "YES", playAgain );
+        alert.setNegativeButton( "NO", playAgain );
+        alert.show( );
+    }
+
+    /**
+     * Click listener for Game board
+     */
     private class ButtonHandler implements View.OnClickListener {
         public void onClick( View v ) {
             Log.d("button clicked", "button clicked");
 
-            for( int row = 0; row < TicTacToe.SIDE; row ++ ) {
-                for (int column = 0; column < TicTacToe.SIDE; column++) {
-                    if (v == buttons[row][column]) {
-                        int move = row * TicTacToe.SIDE + column;
-                        sendMove(move);
+            for( int row = 0; row < TicTacToe.SIDE; row ++ )
+                for( int column = 0; column < TicTacToe.SIDE; column++ )
+                    if( v == buttons[row][column] ) {
+                        sendMove((row * TicTacToe.SIDE) + column);
                         update(row, column);
                     }
-                }
-            }
         }
     }
 
-    public void showNewGameDialog() {
-        if (!isFinishing()) {
-            AlertDialog.Builder alert = new AlertDialog.Builder(this);
-            alert.setTitle(tttGame.result());
-            alert.setMessage("Do you want to play again?");
-            PlayDialog playAgain = new PlayDialog();
-            alert.setPositiveButton("YES", playAgain);
-            alert.setNegativeButton("NO", playAgain);
-            alert.show();
-        }
-    }
-
+    /**
+     * Click listener for Play Again Dialog
+     */
     private class PlayDialog implements DialogInterface.OnClickListener {
-        public void onClick(DialogInterface dialog, int id) {
-            if (!isFinishing()) {
-                if (id == DialogInterface.BUTTON_POSITIVE) {
-                    // Switch the player's turn for the next game
-                    tttGame.switchPlayer();
-
-                    tttGame.resetGame();
-                    enableButtons(true);
-                    resetButtons();
-                    status.setBackgroundColor(Color.GREEN);
-                    status.setText("Your Turn"); // Set the initial status
-                } else if (id == DialogInterface.BUTTON_NEGATIVE) {
-                    MainActivity.this.finish();
-                }
+        public void onClick( DialogInterface dialog, int id ) {
+            if( id == -1 ) /* YES button */ {
+                tttGame.resetGame( );
+                enableButtons( true );
+                resetButtons( );
+                status.setBackgroundColor( Color.GREEN );
+                status.setText( tttGame.result( ) );
+                tttGame.setPlayer(tttGame.getPlayer() == 1 ? 2:1);
+                updateTurnStatus();
             }
+            else if( id == -2 ) // NO button
+                MainActivity.this.finish( );
         }
     }
+
+    /**
+     * Updates game states when turn changes
+     */
+    private void updateTurnStatus() {
+        if(tttGame.getPlayer() == tttGame.getTurn()) {
+            status.setText("Your Turn");
+            enableButtons(true);
+            shouldRequestMove = false;
+        } else{
+            status.setText("Waiting for Opponent");
+            enableButtons(false);
+            shouldRequestMove = true;
+        }
+    }
+
+    /**
+     * Request move from the server
+     * If there is a valid move, the game board is updated
+     */
+    private void requestMove() {
+        Request request = new Request();
+        request.setType(Request.RequestType.REQUEST_MOVE);
+
+        AppExecutors.getInstance().networkIO().execute(()-> {
+            GamingResponse response = SocketClient.getInstance().sendRequest(request, GamingResponse.class);
+
+            AppExecutors.getInstance().mainThread().execute(()-> {
+                if (response == null) {
+                    Toast.makeText(getApplicationContext(), "Network Error", Toast.LENGTH_LONG).show();
+                } else if (response.getStatus() == Response.ResponseStatus.FAILURE) {
+                    Toast.makeText(getApplicationContext(), response.getMessage(), Toast.LENGTH_LONG).show();
+                } else if(response.getMove() != -1){
+                    // Convert cell id to row and columns
+                    int row = response.getMove() / 3;
+                    int col = response.getMove() % 3;
+                    update(row, col);
+                }
+            });
+        });
+
+    }
+
+    /**
+     * Sends the users move to the server
+     * @param move The cell the user clicked from 0-8
+     */
+    private void sendMove(int move) {
+        Request request = new Request();
+        request.setType(Request.RequestType.SEND_MOVE);
+        request.setData(gson.toJson(move));
+
+        Log.e(TAG, "Sending Move: " + move);
+        AppExecutors.getInstance().networkIO().execute(()-> {
+            Response response = SocketClient.getInstance().sendRequest(request, Response.class);
+            AppExecutors.getInstance().mainThread().execute(()-> {
+                if(response == null) {
+                    Toast.makeText(this, "Couldn't send game move", Toast.LENGTH_SHORT).show();
+                } else if(response.getStatus() == Response.ResponseStatus.FAILURE) {
+                    Toast.makeText(this, response.getMessage(), Toast.LENGTH_SHORT).show();
+                }else{ //Success
+                    Log.e(TAG, "Move sent");
+                }
+            });
+        });
+    }
+
+    /**
+     * Will be automatically called by Android when this page closes
+     */
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
-        // Close the socket connection and release resources when the app is destroyed
-        SocketClient.getInstance().close();
-    }
-    private void startPeriodicRequests() {
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (shouldRequestMove) {
-                    // Call the method to send a request to the server (e.g., requestMove())
-                    appExecutors.networkIO().execute(new Runnable() {
-                        @Override
-                        public void run() {
-                            requestMove();
-                        }
-                    });
-                }
-
-                // Schedule the next request after the defined interval
-                handler.postDelayed(this, REQUEST_INTERVAL);
-            }
-        }, REQUEST_INTERVAL);
-    }
-    private void requestMove() {
-        // Create a Request with type REQUEST_MOVE
-        Request request = new Request(Request.RequestType.REQUEST_MOVE, "");
-
-        // Send the request using the SocketClient and receive a response
-        Response response = SocketClient.getInstance().sendRequest(request, Response.class);
-
-        if (response != null && response.getData() != null) {
-            // Check if the response is successful and contains a valid move
-            if (response.getStatus() == Response.ResponseStatus.SUCCESS) {
-                Integer moveInteger = gson.fromJson(response.getData(), Integer.class);
-
-                if (moveInteger != null) {
-                    int move = moveInteger.intValue();
-
-                    // Update the game board based on the received move
-                    appExecutors.mainThread().execute(new Runnable() {
-                        @Override
-                        public void run() {
-                            update(move / TicTacToe.SIDE, move % TicTacToe.SIDE);
-                        }
-                    });
-                }
-            }
-        }
-    }
-
-
-    private void sendMove(int move) {
-        final int finalMove = move; // Store the move as a final variable
-
-        // Execute the network-related code on a background thread using networkIO executor
-        AppExecutors appExecutors = AppExecutors.getInstance();
-        appExecutors.networkIO().execute(new Runnable() {
-            @Override
-            public void run() {
-                // Create a Request with type SEND_MOVE and set the data attribute with the move
-                Request request = new Request(Request.RequestType.SEND_MOVE, gson.toJson(finalMove));
-
-                // Send the request using the SocketClient
-                Response response = SocketClient.getInstance().sendRequest(request, Response.class);
-
-                if (response != null && response.getStatus() == Response.ResponseStatus.SUCCESS) {
-                    // Update the game board locally
-                    appExecutors.mainThread().execute(new Runnable() {
-                        @Override
-                        public void run() {
-                            update(finalMove / TicTacToe.SIDE, finalMove % TicTacToe.SIDE);
-                        }
-                    });
-                }
-            }
-        });
+        handler.removeCallbacks(refresh);
     }
 }
