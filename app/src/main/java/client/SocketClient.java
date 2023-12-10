@@ -12,8 +12,8 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
-import socket.GamingResponse;
 import socket.Request;
+import socket.Response;
 
 public class SocketClient {
     /**
@@ -64,7 +64,7 @@ public class SocketClient {
      * Can be accessed only the within the class (for singleton design pattern)
      */
     private SocketClient() {
-        String HOSTNAME = "192.168.68.104";
+        String HOSTNAME = "192.168.68.109";
         int PORT = 5850;
 
         gson = new GsonBuilder().serializeNulls().create();
@@ -87,7 +87,7 @@ public class SocketClient {
      * @param request The request to be sent to the server
      * @param responseClass The class of response we expect from the server
      * @return Object of the responseClass received from the server
-     * @param <T> {@link socket.Response} class or one of its subclasses e.g., {@link socket.GamingResponse}
+     * @param <T> {@link Response} class or one of its subclasses e.g., {@link GamingResponse}
      */
     public <T> T sendRequest(Request request, Class<T> responseClass) {
         try {
@@ -122,5 +122,7 @@ public class SocketClient {
             Log.e(TAG, "Client IOStreams Failed", e);
         }
     }
+
+
 
 }

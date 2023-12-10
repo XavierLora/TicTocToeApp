@@ -1,6 +1,8 @@
 package clarkson.ee408.tictactoev4;
 
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Point;
 import android.os.Bundle;
@@ -19,6 +21,7 @@ import com.google.gson.GsonBuilder;
 import client.AppExecutors;
 import client.SocketClient;
 import socket.GamingResponse;
+import socket.PairingResponse;
 import socket.Request;
 import socket.Response;
 
@@ -43,7 +46,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate( Bundle savedInstanceState ) {
         super.onCreate( savedInstanceState );
-        tttGame = new TicTacToe(2);
+        int player = getIntent().getIntExtra("PLAYER", 0);
+        tttGame = new TicTacToe(player);
         buildGuiByCode( );
 
         gson = new GsonBuilder().serializeNulls().create();
@@ -212,6 +216,7 @@ public class MainActivity extends AppCompatActivity {
             }
             else if( id == -2 ) // NO button
                 MainActivity.this.finish( );
+                completeGame();
         }
     }
 
@@ -288,5 +293,48 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         handler.removeCallbacks(refresh);
+        if (tttGame != null) {
+            if (tttGame.isGameOver()) {
+                completeGame();
+            } else {
+                abortGame();
+            }
+        }
+    }
+    /**
+     * Send an ABORT_GAME request to the server to signify that a user left an ongoing game.
+     */
+    private void abortGame() {
+        Request request = new Request(Request.RequestType.ABORT_GAME, gson.toJson(null));
+        sendRequest(request, "Game aborted successfully", "Failed to abort game");
+    }
+
+    /**
+     * Send a COMPLETE_GAME request to the server to signify that a user left the game after refusing to play again.
+     */
+    private void completeGame() {
+        Request request = new Request(Request.RequestType.COMPLETE_GAME, gson.toJson(null));
+        sendRequest(request, "Game completed successfully", "Failed to complete game");
+    }
+    /**
+     * Common method to send a request to the server and show a toast based on the response.
+     *
+     * @param request The request to be sent to the server
+     * @param successMessage The success message to show in the toast
+     * @param failureMessage The failure message to show in the toast
+     */
+    private void sendRequest(Request request, String successMessage, String failureMessage) {
+        AppExecutors.getInstance().networkIO().execute(() -> {
+            Response response = SocketClient.getInstance().sendRequest(request, Response.class);
+            AppExecutors.getInstance().mainThread().execute(() -> {
+                if (response != null && response.getStatus() == Response.ResponseStatus.SUCCESS) {
+                    Toast.makeText(getApplicationContext(), successMessage, Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(getApplicationContext(), failureMessage, Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
+
+
     }
 }

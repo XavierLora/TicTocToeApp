@@ -5,13 +5,14 @@ package socket;
  */
 public class Request {
 
+
     /**
      * Enumeration representing different types of requests.
      */
     public enum RequestType {
         LOGIN,
         REGISTER,
-        UPATE_PAIRING,
+        UPDATE_PAIRING,
         SEND_INVITATION,
         ACCEPT_INVITATION,
         DECLINE_INVITATION,

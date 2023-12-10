@@ -1,5 +1,7 @@
 package socket;
 
+import clarkson.ee408.tictactoev4.TicTacToe;
+
 /**
  * The `GamingResponse` class represents a response specific to gaming-related operations, extending the `Response` class.
  */
@@ -20,7 +22,7 @@ public class GamingResponse extends Response {
      * @param status  The response status (e.g., SUCCESS or ERROR).
      * @param message The response message.
      * @param move    The move associated with the gaming response.
-     * @param active  The activity status (e.g., true if active, false if not).
+     * @param active  The game status.
      */
     public GamingResponse(ResponseStatus status, String message, int move, boolean active) {
         super(status, message);
@@ -42,9 +44,6 @@ public class GamingResponse extends Response {
      *
      * @return `true` if the response is active, `false` if not.
      */
-    public boolean getActive() {
-        return active;
-    }
 
     /**
      * Sets the move associated with the gaming response.
@@ -53,6 +52,15 @@ public class GamingResponse extends Response {
      */
     public void setMove(int move) {
         this.move = move;
+    }
+
+    /**
+     * Checks the activity status of the gaming response.
+     *
+     *
+     */
+    public boolean isActive() {
+        return active;
     }
 
     /**
